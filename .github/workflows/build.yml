@@ -3,6 +3,8 @@ name: ffmpeg-build
 on:
   pull_request:
   push:
+    paths-ignore:
+    - README.md'
   
 jobs:   
   build_ffmpeg_msvc:
@@ -37,7 +39,7 @@ jobs:
           echo "::set-output name=mgwarch::x86_64"
         }
         
-        If ("${{ matrix.platform }}" -eq "gpl") {
+        If ("${{ matrix.license }}" -eq "gpl") {
             echo "::set-output name=licflag::--enable-gpl"
         }
     - uses: msys2/setup-msys2@v2
