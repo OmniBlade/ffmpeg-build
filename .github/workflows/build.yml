@@ -13,7 +13,8 @@ jobs:
       matrix:
         platform: [x86, amd64]
         license: [gpl, lgpl]
-        version: [n4.2.4, n4.3.2, n4.4]
+        version: [n4.2.5, n4.3.3, n4.4.1, n5.0]
+        build: [debug, release]
           
     steps:
     - uses: actions/checkout@v2
@@ -22,7 +23,7 @@ jobs:
         fetch-depth: 0
         ref: ${{ github.event.pull_request.head.sha }}
         
-    - uses: ilammy/msvc-dev-cmd@v1.4.1
+    - uses: ilammy/msvc-dev-cmd@v1.10.0
       with:
         arch: ${{ matrix.platform }}
         
@@ -42,6 +43,12 @@ jobs:
         If ("${{ matrix.license }}" -eq "gpl") {
             echo "::set-output name=licflag::--enable-gpl"
         }
+        
+        If ("${{ matrix.build }}" -eq "debug") {
+            echo "::set-output name=cflags::-MDd"
+            echo "::set-output name=ldflags::/NODEFAULTLIB:libcmt"
+            echo "::set-output name=debug::--enable-debug"
+        }
     - uses: msys2/setup-msys2@v2
       with:
         path-type: inherit
@@ -60,15 +67,16 @@ jobs:
         mkdir ffmpeg-src/build
         cd ffmpeg-src/build
         git checkout ${{ matrix.version }}
-        CC=cl ../configure --toolchain=msvc --arch=${{ steps.vars.outputs.ffarch }} --enable-x86asm  --enable-asm --enable-shared --disable-static --disable-programs --enable-avresample ${{ steps.vars.outputs.licflag }} --prefix=../../ffmpeg
+        CC=cl ../configure --toolchain=msvc --arch=${{ steps.vars.outputs.ffarch }} --extra-cflags="-Z7 ${{ steps.vars.outputs.cflags }}" --extra-cxxflags="-Z7 ${{ steps.vars.outputs.cflags }}" --extra-ldflags="/debug:full ${{ steps.vars.outputs.ldlags }}" ${{ steps.vars.outputs.debug }} --enable-x86asm  --enable-asm --enable-shared --disable-static --disable-programs ${{ steps.vars.outputs.licflag }} --prefix=../../ffmpeg
         make -j 2
         make install
+        find . -name \*.pdb -exec cp -v '{}' "../../ffmpeg/bin" \;
         
     - name: Create archives
       shell: bash
       run: |
         mkdir artifact
-        7z a artifact/ffmpeg-${{ matrix.version }}-win-msvc-${{ steps.vars.outputs.mgwarch }}-${{ matrix.license }}.zip ffmpeg/*
+        7z a artifact/ffmpeg-${{ matrix.version }}-win-msvc-${{ steps.vars.outputs.mgwarch }}-${{ matrix.license }}-${{ matrix.build }}.zip ffmpeg/*
         
     - name: Upload artifact
       uses: actions/upload-artifact@v1
